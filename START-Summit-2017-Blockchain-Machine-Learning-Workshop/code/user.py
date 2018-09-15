@@ -1,20 +1,3 @@
-'''
-Introduction:
-Workshop Example Code from the Blockchain and Machine Learning Workshop at START Summit 2017 in Switzerland
-
-Description:
-The file user.py implements an easy chat-client for transmitting text and images to Blockchain smart contract.
-Tags are automatically extracted from an image using a Deep Residual Neural Network.
-
-Author:
-Thomas Schmiedel, Data Reply 2017
-
-Mail:
-t.schmiedel@reply.de
-
-Note:
-This is just example code and not perfect yet, if you have any questions, advice, ..., just drop me a mail :-)
-'''
 
 ##################################
 # imports
@@ -64,7 +47,7 @@ RPC_HOST = '127.0.0.1'
 RPC_PORT = 8545
 GAS = 20000000
 IMAGE_SIZE = 256
-maximumUnreviewedEssay = 1;
+maximumUnreviewedEssay = 2;
 
 
 ##################################
@@ -86,7 +69,7 @@ signal.signal(signal.SIGINT, handler)
 ##################################
 class Decoder:
     @staticmethod
-    def decodeABI(tinput, sig='setNewUserState(string,string)'):
+    def decodeABI(tinput, sig='uploadEssay(bytes,string)'):#?
         abi = tinput[2 :]
         hash = utils.sha3(sig)[: 4].encode('hex')
         if abi[: 8] != hash:
@@ -150,7 +133,7 @@ def main():
     #
     # console
     #
-    topics = []
+    fields = []
     numberOfEssayToBeReviewed = 0
     print('-' * 80)
     print('starting chat command line...')
@@ -179,24 +162,20 @@ def main():
         elif 'send' in command:
             print('-' * 80)
             print('[composing new message]')
-            sys.stdout.write('message....: ')
-            msg = sys.stdin.readline().strip()
-            '''
-            sys.stdout.write('image file.: ')
-            img = sys.stdin.readline().strip()
-            '''
-            sys.stdout.write('custom tags: ')
-            tag = sys.stdin.readline().strip()
+            sys.stdout.write('your essay....: ')
+            filename = sys.stdin.readline().strip()
+            sys.stdout.write('topics: ')
+            topics = sys.stdin.readline().strip()
             print('-' * 80)
             print('sending...')
             # loading image
-            '''
             try:
-                image = Image.open(img)
+                essay = open(filename)
             except Exception as e:
-                print('loading {} failed'.format(img))
+                print('loading {} failed'.format(filename))
                 continue
-            '''
+            content = essay.read()
+            essay.close()
             # prediction
             '''
             print('precessing image...')
@@ -209,7 +188,7 @@ def main():
             bs = ImageHelper.imgToBytes(image)
             '''
             tx = rpc.call_with_transaction(account_addr, contract_addr,
-                                           'setNewUserState(string,string)', [msg, tag],
+                                           'uploadEssay(bytes,string)', [content, topics],
                                            gas=GAS)
             print('done, transaction id: {}'.format(tx))
 
@@ -231,12 +210,12 @@ def main():
         #
         # set tag filters
         #
-        elif 'topics' in command:
-            topics = [t.strip() for t in command.split()[1 : ]]
-            if len(topics) == 0:
-                print('please provide actual topics after <topics> command')
+        elif 'fields' in command:
+            fields = [t.strip() for t in command.split()[1 : ]]
+            if len(fields) == 0:
+                print('please provide actual research fields after <fields> command')
                 continue
-            print('filter set for messages on topics: {}'.format(topics))
+            print('filter set for essays on research fields: {}'.format(fields))
 
         #
         # search complete blockchain for messages with certain tags
@@ -264,8 +243,8 @@ def main():
         # start listening for messages
         #
         elif 'listen' in command:
-            if len(topics) == 0:
-                print('call topics first')
+            if len(fields) == 0:
+                print('set your research fields first')
                 continue
             global LISTENING
             LISTENING = True
@@ -279,20 +258,20 @@ def main():
                         res = Decoder.decodeABI(trans['input'])
                         if res is None:
                             continue
-                        msg, tags = res
-                        if all(t not in tags for t in topics):
+                        content, topics = res
+                        if all(t not in topics for t in fields):
                             continue
                         print('-' * 80)
-                        print('message from user {} (block {}):'.format(trans['from'], newBlock))
-                        print('  content: {}'.format(msg))
-                        print('  tags...: {}'.format(tags))
-                        numberOfEssayToBeReviewed += 1
-                        if numberOfEssayToBeReviewed >= maximumUnreviewedEssay:
-                            print('Receiving essay has been banned since you have too much essays to be reviewed.')
-                            break
-                        '''
-                        ImageHelper.bytesToImg(code).show(title='{}'.format(tags))
-                        '''
+                        #print('message from user {} (block {}):'.format(trans['from'], newBlock))
+                        print('  you have received an essay on topics...: {}'.format(topics))
+                        g = open('draft', 'w')
+                        g.write(content)
+                        g.close()
+                        sys.stdout.write('please write your review here:')
+                        review = sys.stdin.readline().strip()
+                        rpc.call_with_transaction(account_addr, contract_addr,
+                                                       'uploadEssay(bytes,string)', [content, topics],
+                                                       gas=GAS)
                 time.sleep(1)
 
         #
