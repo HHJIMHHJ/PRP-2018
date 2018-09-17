@@ -1,21 +1,5 @@
-/*
-Introduction:
-Workshop Example Code from the Blockchain and Machine Learning Workshop at START Summit 2017 in Switzerland
 
-Description:
-This file implements the smart contract to be sent to the Blockchain.
-
-Author:
-Thomas Schmiedel, Data Reply 2017
-
-Mail:
-t.schmiedel@reply.de
-
-Note:
-This is just example code and not perfect yet, if you have any questions, advice, ..., just drop me a mail :-)
-*/
-
-pragma solidity ^0.4.0;
+pragma solidity ^0.4.25;
 
 /*
  * The actual smart contract that can store a message, an image and tags for each user
@@ -65,27 +49,68 @@ contract ImgStorage
 		//userMapping[msg.sender].userImage = imgData;
 		userMapping[msg.sender].userTags = tags;
 	}
-/**/
+	
+	struct Review{
+	    string content;
+	    address reviewer;
+	}
+
 	struct Essay
 	{
 	address author;
+	string title;
 	bytes content;
 	string topics;
-	string review1;
-	string review2;
+	Review[2] review;
 	}
 
 	mapping (address => Essay) userEssay;	
 
-	function uploadEssay(bytes content, string topics)
+	function uploadEssay(bytes content, string topics,string title)
 	{
 		userEssay[msg.sender].content = content;
+		userEssay[msg.sender].title = title;
 		userEssay[msg.sender].author = msg.sender;
 		userEssay[msg.sender].topics = topics;
+		uint seed = block.difficulty;
+		while (true){
+		    uint first = random(seed);
+		    seed++;
+		    if (accounts[first] != msg.sender){
+		        uint second = random(seed);
+		        seed++;
+		        if (accounts[second] != msg.sender && accounts[first] != accounts[second])
+		        break;
+		    }
+		}
+		userEssay[msg.sender].review[0].reviewer = 0xffcf8fdee72ac11b5c542428b35eef5769c409f0;//accounts[first];
+		userEssay[msg.sender].review[1].reviewer = 0x22d491bde2303f2f43325b2108d26f1eaba1e32b;//accounts[second];
 	}
 
-	function uploadReview(string review)
+	function uploadReview(string title, string review)
 	{
-		
+	    for (uint i = 0;i <= 9;i++){
+	        if (strcmp(userEssay[accounts[i]].title,title)){
+	            address r1 = userEssay[accounts[i]].review[0].reviewer;
+	            address r2 = userEssay[accounts[i]].review[1].reviewer;
+	            break;
+	        }
+	    }
+		require(msg.sender == r1 || msg.sender == r2,
+		"sorry, you don't have permission to review this essay");
+		require(!strcmp(userEssay[accounts[i]].review[0].content,'') || !strcmp(userEssay[accounts[i]].review[1].content,''),
+		"this essay has already been reviewed");
+		if (r1 == msg.sender) userEssay[accounts[i]].review[0].content = review;
+		else userEssay[accounts[i]].review[1].content = review;
 	}
+	
+	//利用哈希函数实现随机数
+	function random(uint seed) private returns (uint8) {
+        return uint8(uint256(keccak256(block.timestamp, seed))%10);
+    }
+    
+    //利用哈希函数实现字符串比较
+    function strcmp(string a, string b) returns (bool){
+        return keccak256(a) == keccak256(b);
+    }
 }

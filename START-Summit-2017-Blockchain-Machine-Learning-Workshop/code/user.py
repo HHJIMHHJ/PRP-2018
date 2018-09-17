@@ -69,12 +69,12 @@ signal.signal(signal.SIGINT, handler)
 ##################################
 class Decoder:
     @staticmethod
-    def decodeABI(tinput, sig='uploadEssay(bytes,string)'):#?
+    def decodeABI(tinput, sig='uploadEssay(bytes,string,string)'):#?
         abi = tinput[2 :]
         hash = utils.sha3(sig)[: 4].encode('hex')
         if abi[: 8] != hash:
             return None
-        return decode_abi(['string', 'string'], abi[8 :].decode('hex'))
+        return decode_abi(['bytes','string', 'string'], abi[8 :].decode('hex'))
 
 
 ##################################
@@ -133,8 +133,7 @@ def main():
     #
     # console
     #
-    fields = []
-    numberOfEssayToBeReviewed = 0
+    fields = 'chemistry'#
     print('-' * 80)
     print('starting chat command line...')
     while True:
@@ -164,6 +163,8 @@ def main():
             print('[composing new message]')
             sys.stdout.write('your essay....: ')
             filename = sys.stdin.readline().strip()
+            sys.stdout.write('your title....: ')
+            title = sys.stdin.readline().strip()
             sys.stdout.write('topics: ')
             topics = sys.stdin.readline().strip()
             print('-' * 80)
@@ -188,7 +189,7 @@ def main():
             bs = ImageHelper.imgToBytes(image)
             '''
             tx = rpc.call_with_transaction(account_addr, contract_addr,
-                                           'uploadEssay(bytes,string)', [content, topics],
+                                           'uploadEssay(bytes,string,string)', [content, topics, title],
                                            gas=GAS)
             print('done, transaction id: {}'.format(tx))
 
@@ -258,20 +259,22 @@ def main():
                         res = Decoder.decodeABI(trans['input'])
                         if res is None:
                             continue
-                        content, topics = res
+                        content, topics, title = res
                         if all(t not in topics for t in fields):
                             continue
                         print('-' * 80)
                         #print('message from user {} (block {}):'.format(trans['from'], newBlock))
                         print('  you have received an essay on topics...: {}'.format(topics))
+                        print('title is:{}'.format(title))
                         g = open('draft', 'w')
                         g.write(content)
                         g.close()
                         sys.stdout.write('please write your review here:')
                         review = sys.stdin.readline().strip()
                         rpc.call_with_transaction(account_addr, contract_addr,
-                                                       'uploadEssay(bytes,string)', [content, topics],
+                                                       'uploadReview(string,string)', [title, review],
                                                        gas=GAS)
+                        break
                 time.sleep(1)
 
         #
